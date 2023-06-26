@@ -5,33 +5,11 @@ import {
   Square,
   Vector,
 } from "simulationjs";
-import "./App.css";
-import { generate, hasDiagonalConnection, path, wall } from "./utils/split-gen";
-
-export type Grid = number[][];
-
-export class Coord {
-  x: number;
-  y: number;
-
-  constructor(x: number, y: number) {
-    this.x = x;
-    this.y = y;
-  }
-
-  stringify() {
-    return `${this.x}:${this.y}`;
-  }
-
-  static fromString(str: string) {
-    const parts = str.split(":");
-
-    const x = +parts[0];
-    const y = +parts[1];
-
-    return new Coord(x, y);
-  }
-}
+import "./App.scss";
+import { finish, generate, path, taken, wall } from "./utils/split-gen";
+import { solveMaze } from "./utils/solve";
+import { Grid, copyGrid } from "./utils/utils";
+import { createSignal } from "solid-js";
 
 const App = () => {
   let canvasRef: HTMLCanvasElement;
@@ -41,6 +19,8 @@ const App = () => {
 
   const size = 500;
   const gridSize = 41;
+
+  const [error, setError] = createSignal<string | null>(null);
 
   setTimeout(() => {
     canvas = new Simulation(canvasRef);
@@ -53,22 +33,6 @@ const App = () => {
 
     maze = generate(gridSize, (grid) => drawMaze(grid));
     drawMaze(maze);
-
-    canvas.on("click", (e: MouseEvent) => {
-      const p = new Vector(e.offsetX, e.offsetY);
-
-      const x = Math.floor(p.x / (size / gridSize));
-      const y = Math.floor(p.y / (size / gridSize));
-
-      console.log({
-        topLeft: hasDiagonalConnection(maze, x, y, -1, -1),
-        topRight: hasDiagonalConnection(maze, x, y, 1, -1),
-        bottomLeft: hasDiagonalConnection(maze, x, y, -1, 1),
-        bottomRight: hasDiagonalConnection(maze, x, y, 1, 1),
-      });
-
-      console.log(x, y);
-    });
   });
 
   function drawMaze(maze: Grid) {
@@ -87,7 +51,11 @@ const App = () => {
             ? new Color(0, 0, 0)
             : item === path
             ? new Color(255, 255, 255)
-            : new Color(0, 0, 255)
+            : item === taken
+            ? new Color(0, 0, 255)
+            : item === finish
+            ? new Color(255, 0, 0)
+            : new Color(0, 255, 0)
         );
         mazeSquares.add(square);
       });
@@ -99,10 +67,18 @@ const App = () => {
     drawMaze(maze);
   }
 
+  function handleSolveMaze() {
+    const err = solveMaze(copyGrid(maze), (grid) => drawMaze(grid), 15);
+    setError(err);
+  }
+
   return (
     <div class="app">
       <div class="controls">
+        <h1>Controls</h1>
+        <button onClick={handleSolveMaze}>Solve</button>
         <button onClick={resetGrid}>Reset</button>
+        {error() !== null && <span class="error">{error()}</span>}
       </div>
       {/* @ts-ignore */}
       <canvas ref={canvasRef} />

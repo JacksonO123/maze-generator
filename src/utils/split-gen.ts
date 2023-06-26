@@ -1,7 +1,9 @@
-import { Coord, Grid } from "../App";
+import { Coord, Grid, copyGrid } from "./utils";
 
 export const wall = 0 as const;
 export const path = 1 as const;
+export const taken = 2 as const;
+export const finish = 3 as const;
 
 function initGrid(size: number) {
   const res: Grid = [];
@@ -48,7 +50,7 @@ function splitIteration(
     grid[i][randomRow] = path;
   }
 
-  const copy = [...grid.map((row) => [...row])];
+  const copy = copyGrid(grid);
   history.push(copy);
 
   grid = splitIteration(grid, xStart, yStart, randomCol, randomRow, history);
@@ -182,11 +184,30 @@ function fixDiagonalConnections(grid: Grid, cuttoff = 0) {
   return grid;
 }
 
+function generateStartEnd(grid: Grid) {
+  let startIndex = Math.floor(Math.random() * (grid.length - 2)) + 1;
+  let endIndex = Math.floor(Math.random() * (grid.length - 2)) + 1;
+
+  while (grid[1][startIndex] === wall) {
+    startIndex = Math.floor(Math.random() * (grid.length - 2)) + 1;
+  }
+
+  while (grid[grid.length - 2][endIndex] === wall) {
+    endIndex = Math.floor(Math.random() * (grid.length - 2)) + 1;
+  }
+
+  grid[0][startIndex] = path;
+  grid[grid.length - 1][endIndex] = path;
+
+  return grid;
+}
+
 function fixMaze(grid: Grid) {
   grid = fixWalls(grid);
   grid = fixLonelyWalls(grid);
   grid = fixDiagonalConnections(grid, 1);
   grid = fixDiagonalConnections(grid);
+  grid = generateStartEnd(grid);
 
   return grid;
 }
@@ -198,7 +219,7 @@ export function generate(size: number, drawCb: (grid: Grid) => void) {
   grid = splitIteration(grid, 0, 0, grid.length, grid.length, history);
 
   grid = fixMaze(grid);
-  history.push([...grid.map((row) => [...row])]);
+  history.push(copyGrid(grid));
 
   // // for animating
   // const delay = 500;
@@ -213,10 +234,11 @@ export function generate(size: number, drawCb: (grid: Grid) => void) {
   addEventListener("keydown", (e) => {
     if (e.key === "ArrowLeft") {
       index = Math.max(0, index - 1);
+      drawCb(history[index]);
     } else if (e.key === "ArrowRight") {
       index = Math.min(history.length - 1, index + 1);
+      drawCb(history[index]);
     }
-    drawCb(history[index]);
   });
 
   return grid;
