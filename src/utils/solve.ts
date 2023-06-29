@@ -1,43 +1,166 @@
-import { finish, path, taken, wall } from "./split-gen";
+import { finish, path, taken } from "./split-gen";
 import { Coord, Grid, copyGrid } from "./utils";
+
+class SolutionLeg {
+  steps: Coord[];
+  moves: Coord[];
+
+  constructor(pos: Coord, moves: Coord[]) {
+    this.steps = [pos];
+    this.moves = moves;
+  }
+
+  getStart() {
+    this.steps.splice(1);
+    return this.steps[0];
+  }
+
+  addStep(pos: Coord) {
+    this.steps.push(pos);
+  }
+
+  getSteps() {
+    return this.steps.map((step) => step.clone());
+  }
+}
+
+class Solution {
+  legs: SolutionLeg[];
+
+  constructor(startPos: number) {
+    this.legs = [
+      new SolutionLeg(new Coord(startPos, 0), [new Coord(startPos, 1)]),
+    ];
+  }
+
+  getRecentPivot() {
+    if (this.legs.length === 0) return null;
+
+    return this.legs[this.legs.length - 1].getStart();
+  }
+
+  getPrevPivot() {
+    this.legs.pop();
+
+    if (this.legs.length === 0) return null;
+
+    return this.legs[this.legs.length - 1].getStart();
+  }
+
+  addLeg(pos: Coord, moves: Coord[]) {
+    this.legs.push(new SolutionLeg(pos, moves));
+  }
+
+  addStep(pos: Coord) {
+    this.legs[this.legs.length - 1].addStep(pos);
+  }
+
+  getSteps() {
+    return this.legs.reduce((acc, leg) => {
+      const steps = leg.getSteps();
+      acc.push(...steps);
+      return acc;
+    }, [] as Coord[]);
+  }
+}
+
+type HistoryItem = {
+  type: typeof taken | typeof finish;
+  pos: Coord;
+};
+
+class SolutionHistory {
+  history: HistoryItem[][];
+
+  constructor() {
+    this.history = [[]];
+  }
+
+  addStep(type: typeof taken | typeof finish, pos: Coord) {
+    this.history[this.history.length - 1].push({
+      type,
+      pos,
+    });
+  }
+
+  addSteps(type: typeof taken | typeof finish, steps: Coord[]) {
+    this.history[this.history.length - 1].push(
+      ...steps.map((step) => ({
+        type,
+        pos: step,
+      }))
+    );
+  }
+
+  addGrid() {
+    this.history.push([]);
+  }
+
+  forEach(grid: Grid, cb: (copy: Grid, step: number) => void) {
+    let counter = 0;
+
+    let copy = copyGrid(grid);
+
+    this.history.forEach((historyGrid) => {
+      historyGrid.forEach((item) => {
+        copy[item.pos.y][item.pos.x] = item.type;
+        cb(copyGrid(copy), counter);
+        counter++;
+      });
+      copy = copy.map((row) =>
+        row.map((item) => (item === taken || item === finish ? path : item))
+      );
+    });
+  }
+}
+
+function getAvailableMoves(grid: Grid, visited: boolean[][], pos: Coord) {
+  const availableMoves: Coord[] = [];
+
+  const moves = [
+    new Coord(pos.x - 1, pos.y),
+    new Coord(pos.x + 1, pos.y),
+    new Coord(pos.x, pos.y - 1),
+    new Coord(pos.x, pos.y + 1),
+  ];
+
+  moves.forEach((move) => {
+    if (
+      move.x >= 0 &&
+      move.x < grid.length &&
+      move.y >= 0 &&
+      move.y < grid.length
+    ) {
+      if (!visited[move.y][move.x]) {
+        const pos = grid[move.y][move.x];
+        if (pos === path) availableMoves.push(move);
+      }
+    }
+  });
+
+  return availableMoves;
+}
 
 export function solveMaze(
   grid: Grid,
   drawCb: (grid: Grid) => void,
   delay: number
 ) {
-  const history: Coord[] = [];
+  const history = new SolutionHistory();
 
   const startPos = grid[0].indexOf(path);
 
-  const pivotPoints: Coord[] = [];
+  let solution = new Solution(startPos);
   let currentPos = new Coord(startPos, 0);
+  let visited = grid.map((row) => row.map(() => false));
 
   while (currentPos.y < grid.length - 1) {
-    grid[currentPos.y][currentPos.x] = taken;
+    visited[currentPos.y][currentPos.x] = true;
+    solution.addStep(currentPos.clone());
 
-    history.push(currentPos.clone());
+    history.addStep(taken, currentPos.clone());
 
-    const availableMoves: Coord[] = [];
-
-    const moves = [
-      new Coord(currentPos.x - 1, currentPos.y),
-      new Coord(currentPos.x + 1, currentPos.y),
-      new Coord(currentPos.x, currentPos.y - 1),
-      new Coord(currentPos.x, currentPos.y + 1),
-    ];
-
-    moves.forEach((move) => {
-      if (
-        move.x >= 0 &&
-        move.x < grid.length &&
-        move.y >= 0 &&
-        move.y < grid.length
-      ) {
-        const pos = grid[move.y][move.x];
-        if (pos === path) availableMoves.push(move);
-      }
-    });
+    const availableMoves = getAvailableMoves(grid, visited, currentPos);
 
     for (let i = 0; i < availableMoves.length; i++) {
       if (availableMoves[i].y === grid.length - 1) {
@@ -46,44 +169,45 @@ export function solveMaze(
     }
 
     if (availableMoves.length === 0) {
-      const newPos = pivotPoints.pop();
+      const pivot = (function getPivot(newPos: Coord | null) {
+        if (newPos === null) {
+          return null;
+        } else if (currentPos.equals(newPos)) {
+          return getPivot(solution.getPrevPivot());
+        }
+        return newPos;
+      })(solution.getRecentPivot());
 
-      if (!newPos) {
+      if (pivot === null) {
         return "No solution";
       }
 
-      currentPos = newPos;
+      currentPos = pivot.clone();
     } else if (availableMoves.length >= 1) {
       if (availableMoves.length > 1) {
-        pivotPoints.push(currentPos.clone());
+        solution.addLeg(
+          currentPos.clone(),
+          availableMoves.map((move) => move.clone())
+        );
       }
 
       currentPos = availableMoves.sort((a, b) => b.y - a.y)[0];
     }
   }
 
-  grid[currentPos.y][currentPos.x] = finish;
-
-  history.push(currentPos.clone());
+  history.addGrid();
+  history.addSteps(taken, solution.getSteps());
+  history.addStep(finish, currentPos.clone());
 
   if (delay === 0) {
+    console.log("draw");
     drawCb(grid);
   } else {
-    const copy = copyGrid(grid).map((row) =>
-      row.map((item) => (item !== path && item !== wall ? path : item))
-    ) as Grid;
-
-    for (let i = 0; i < history.length; i++) {
+    history.forEach(grid, (copy, count) => {
       setTimeout(() => {
-        if (i < history.length - 1) {
-          copy[history[i].y][history[i].x] = taken;
-        } else {
-          copy[history[i].y][history[i].x] = finish;
-        }
-
         drawCb(copy);
-      }, i * delay);
-    }
+      }, count * delay);
+    });
   }
 
   return null;

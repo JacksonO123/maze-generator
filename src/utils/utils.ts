@@ -29,4 +29,8 @@ export class Coord {
   clone() {
     return new Coord(this.x, this.y);
   }
+
+  equals(coord: Coord) {
+    return this.x === coord.x && this.y === coord.y;
+  }
 }
