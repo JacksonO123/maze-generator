@@ -88,7 +88,7 @@ class SolutionHistory {
       ...steps.map((step) => ({
         type,
         pos: step,
-      }))
+      })),
     );
   }
 
@@ -108,7 +108,7 @@ class SolutionHistory {
         counter++;
       });
       copy = copy.map((row) =>
-        row.map((item) => (item === taken || item === finish ? path : item))
+        row.map((item) => (item === taken || item === finish ? path : item)),
       );
     });
   }
@@ -144,7 +144,7 @@ function getAvailableMoves(grid: Grid, visited: boolean[][], pos: Coord) {
 export function solveMaze(
   grid: Grid,
   drawCb: (grid: Grid) => void,
-  delay: number
+  delay: number,
 ) {
   const history = new SolutionHistory();
 
@@ -187,7 +187,7 @@ export function solveMaze(
       if (availableMoves.length > 1) {
         solution.addLeg(
           currentPos.clone(),
-          availableMoves.map((move) => move.clone())
+          availableMoves.map((move) => move.clone()),
         );
       }
 

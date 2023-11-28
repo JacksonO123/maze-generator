@@ -36,30 +36,50 @@ const App = () => {
   });
 
   function drawMaze(maze: Grid) {
-    const squareSize = size / gridSize;
+    if (mazeSquares.scene.length === 0) {
+      const squareSize = size / gridSize;
 
-    mazeSquares.empty();
-    maze.forEach((row, i) => {
-      row.forEach((item, j) => {
-        const x = j * squareSize + squareSize / 2;
-        const y = i * squareSize + squareSize / 2;
-        const square = new Square(
-          new Vector(x, y),
-          squareSize,
-          squareSize,
+      maze.forEach((row, i) => {
+        row.forEach((item, j) => {
+          const x = j * squareSize + squareSize / 2;
+          const y = i * squareSize + squareSize / 2;
+          const square = new Square(
+            new Vector(x, y),
+            squareSize,
+            squareSize,
+            item === wall
+              ? new Color(0, 0, 0)
+              : item === path
+                ? new Color(255, 255, 255)
+                : item === taken
+                  ? new Color(0, 0, 255)
+                  : item === finish
+                    ? new Color(255, 0, 0)
+                    : new Color(0, 255, 0),
+          );
+          mazeSquares.add(square);
+        });
+      });
+    }
+
+    for (let i = 0; i < gridSize; i++) {
+      for (let j = 0; j < gridSize; j++) {
+        const index = i * gridSize + j;
+        const item = maze[i][j];
+        const color =
           item === wall
             ? new Color(0, 0, 0)
             : item === path
-            ? new Color(255, 255, 255)
-            : item === taken
-            ? new Color(0, 0, 255)
-            : item === finish
-            ? new Color(255, 0, 0)
-            : new Color(0, 255, 0)
-        );
-        mazeSquares.add(square);
-      });
-    });
+              ? new Color(255, 255, 255)
+              : item === taken
+                ? new Color(0, 0, 255)
+                : item === finish
+                  ? new Color(255, 0, 0)
+                  : new Color(0, 255, 0);
+
+        mazeSquares.scene[index].fill(color);
+      }
+    }
   }
 
   function resetGrid() {

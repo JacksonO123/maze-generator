@@ -241,8 +241,6 @@ export function generate(size: number, drawCb: (grid: Grid) => void) {
     }
   });
 
-  console.log(JSON.stringify(grid));
-
   return grid;
 }
 
